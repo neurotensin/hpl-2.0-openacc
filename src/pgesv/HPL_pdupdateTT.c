@@ -48,6 +48,7 @@
  * Include files
  */
 #include "hpl.h"
+#include "hpl_gpukernel.h"
 
 #ifdef STDC_HEADERS
 void HPL_pdupdateTT
