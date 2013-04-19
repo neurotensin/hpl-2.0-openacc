@@ -218,6 +218,14 @@ void HPL_pdupdateTT
 #else
          HPL_dlaswp00N( jb, nn, Aptr, lda, ipiv );
 #endif
+#if 1 /* _OPENACC */
+         HPL_accdtrsm( HplColumnMajor, HplLeft, HplUpper, HplTrans,
+                       HplUnit, jb, nn, HPL_rone, L1ptr, jb, Aptr, lda );
+
+         HPL_accdgemm( HplColumnMajor, HplNoTrans, HplNoTrans, mp, nn,
+                       jb, -HPL_rone, L2ptr, ldl2, Aptr, lda, HPL_rone,
+                       Mptr( Aptr, jb, 0, lda ), lda );
+#else
          HPL_dtrsm( HplColumnMajor, HplLeft, HplUpper, HplTrans,
                     HplUnit, jb, nn, HPL_rone, L1ptr, jb, Aptr, lda );
 #ifdef HPL_CALL_VSIPL
@@ -238,6 +246,7 @@ void HPL_pdupdateTT
          HPL_dgemm( HplColumnMajor, HplNoTrans, HplNoTrans, mp, nn,
                     jb, -HPL_rone, L2ptr, ldl2, Aptr, lda, HPL_rone,
                     Mptr( Aptr, jb, 0, lda ), lda );
+#endif /* _OPENACC */
 #endif
       }
 #ifdef HPL_CALL_VSIPL

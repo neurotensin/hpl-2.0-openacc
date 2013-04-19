@@ -2,6 +2,527 @@
 #include "hpl_gpukernel.h"
 
 
+static void HPL_accdtrsmLLNN
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iaik, ibij, ibkj, j, jak, jbj, k;
+
+   for( j = 0, jbj = 0; j < N; j++, jbj += LDB )
+   {
+      for( i = 0, ibij= jbj; i < M; i++, ibij += 1 ) { B[ibij] *= ALPHA; }
+      for( k = 0, jak  = 0, ibkj = jbj; k < M; k++, jak += LDA, ibkj += 1 )
+      {
+         B[ibkj] /= A[k+jak];
+         for( i = k+1,    iaik  = k+1+jak, ibij  = k+1+jbj;
+              i < M; i++, iaik +=1,        ibij += 1 )
+         { B[ibij] -= B[ibkj] * A[iaik]; }
+      }
+   }
+}
+
+static void HPL_accdtrsmLLNU
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iaik, ibij, ibkj, j, jak, jbj, k;
+
+   for( j = 0, jbj = 0; j < N; j++, jbj += LDB )
+   {
+      for( i = 0, ibij= jbj; i < M; i++, ibij += 1 ) { B[ibij] *= ALPHA; }
+      for( k = 0, jak  = 0, ibkj = jbj; k < M; k++, jak += LDA, ibkj += 1 )
+      {
+         for( i = k+1,    iaik  = k+1+jak, ibij  = k+1+jbj;
+              i < M; i++, iaik +=1,        ibij += 1 )
+         { B[ibij] -= B[ibkj] * A[iaik]; }
+      }
+   }
+}
+
+static void HPL_accdtrsmLLTN
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   register double            t0;
+   int                        i, iaki, ibij, ibkj, j, jai, jbj, k;
+
+   for( j = 0, jbj = 0; j < N; j++, jbj += LDB )
+   {
+      for( i = M-1,     jai  = (M-1)*LDA, ibij  = M-1+jbj;
+           i >= 0; i--, jai -= LDA,       ibij -= 1 )
+      {
+         t0 = ALPHA * B[ibij];
+         for( k = i+1,    iaki  = i+1+jai, ibkj  = i+1+jbj;
+              k < M; k++, iaki += 1,       ibkj += 1 )
+         { t0 -= A[iaki] * B[ibkj]; }
+         t0 /= A[i+jai];
+         B[ibij] = t0;
+      }
+   }
+}
+
+static void HPL_accdtrsmLLTU
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   register double            t0;
+   int                        i, iaki, ibij, ibkj, j, jai, jbj, k;
+
+   for( j = 0, jbj = 0; j < N; j++, jbj += LDB )
+   {
+      for( i = M-1,     jai  = (M-1)*LDA, ibij  = M-1+jbj;
+           i >= 0; i--, jai -= LDA,       ibij -= 1 )
+      {
+         t0 = ALPHA * B[ibij];
+         for( k = i+1,    iaki  = i+1+jai, ibkj  = i+1+jbj;
+              k < M; k++, iaki += 1,       ibkj += 1 )
+         { t0 -= A[iaki] * B[ibkj]; }
+         B[ibij] = t0;
+      }
+   }
+}
+
+static void HPL_accdtrsmLUNN
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iaik, ibij, ibkj, j, jak, jbj, k;
+
+   for( j = 0, jbj = 0; j < N; j++, jbj += LDB )
+   {
+      for( i = 0, ibij = jbj; i < M; i++, ibij += 1 ) { B[ibij] *= ALPHA; }
+      for( k = M-1,     jak  = (M-1)*LDA, ibkj  = M-1+jbj;
+           k >= 0; k--, jak -= LDA,       ibkj -= 1 )
+      {
+         B[ibkj] /= A[k+jak];
+         for( i = 0,      iaik  = jak, ibij  = jbj;
+              i < k; i++, iaik += 1,   ibij += 1 )
+         { B[ibij] -= B[ibkj] * A[iaik]; }
+      }
+   }
+}
+
+static void HPL_accdtrsmLUNU
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iaik, ibij, ibkj, j, jak, jbj, k;
+
+   for( j = 0, jbj = 0; j < N; j++, jbj += LDB )
+   {
+      for( i = 0, ibij = jbj; i < M; i++, ibij += 1 ) { B[ibij] *= ALPHA; }
+      for( k = M-1,     jak  = (M-1)*LDA, ibkj  = M-1+jbj;
+           k >= 0; k--, jak -= LDA,       ibkj -= 1 )
+      {
+         for( i = 0,      iaik  = jak, ibij  = jbj;
+              i < k; i++, iaik += 1,   ibij += 1 )
+         { B[ibij] -= B[ibkj] * A[iaik]; }
+      }
+   }
+}
+
+static void HPL_accdtrsmLUTN
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iaki, ibij, ibkj, j, jai, jbj, k;
+   register double            t0;
+
+   for( j = 0, jbj  = 0; j < N; j++, jbj += LDB )
+   {
+      for( i = 0, jai  = 0, ibij = jbj; i < M; i++, jai += LDA, ibij += 1 )
+      {
+         t0 = ALPHA * B[ibij];
+         for( k = 0, iaki = jai, ibkj = jbj; k < i; k++, iaki += 1, ibkj += 1 )
+         { t0 -= A[iaki] * B[ibkj]; }
+         t0 /= A[i+jai];
+         B[ibij] = t0;
+      }
+   }
+}
+
+static void HPL_accdtrsmLUTU
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   register double            t0;
+   int                        i, iaki, ibij, ibkj, j, jai, jbj, k;
+
+   for( j = 0, jbj  = 0; j < N; j++, jbj += LDB )
+   {
+      for( i = 0, jai  = 0, ibij = jbj; i < M; i++, jai += LDA, ibij += 1 )
+      {
+         t0 = ALPHA * B[ibij];
+         for( k = 0, iaki = jai, ibkj = jbj; k < i; k++, iaki += 1, ibkj += 1 )
+         { t0 -= A[iaki] * B[ibkj]; }
+         B[ibij] = t0;
+      }
+   }
+}
+
+static void HPL_accdtrsmRLNN
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iakj, ibij, ibik, j, jaj, jbj, jbk, k;
+
+   for( j = N-1,      jaj  = (N-1)*LDA, jbj  = (N-1)*LDB;
+        j >= 0;  j--, jaj -= LDA,       jbj -= LDB )
+   {
+      for( i = 0, ibij = jbj; i < M; i++, ibij += 1 ) { B[ibij] *= ALPHA; }
+      for( k = j+1,    iakj  = j+1+jaj, jbk  = (j+1)*LDB;
+           k < N; k++, iakj += 1,       jbk += LDB )
+      {
+         for( i = 0, ibij = jbj, ibik = jbk; i < M; i++, ibij += 1, ibik += 1 )
+         { B[ibij] -= A[iakj] * B[ibik]; }
+      }
+      for( i = 0, ibij = jbj; i < M; i++, ibij += 1 ) { B[ibij] /= A[j+jaj]; }
+   }
+}
+
+static void HPL_accdtrsmRLNU
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iakj, ibij, ibik, j, jaj, jbj, jbk, k;
+
+   for( j = N-1,      jaj  = (N-1)*LDA, jbj  = (N-1)*LDB;
+        j >= 0;  j--, jaj -= LDA,       jbj -= LDB )
+   {
+      for( i = 0, ibij = jbj; i < M; i++, ibij += 1 ) { B[ibij] *= ALPHA; }
+      for( k = j+1,    iakj  = j+1+jaj, jbk  = (j+1)*LDB;
+           k < N; k++, iakj += 1,       jbk += LDB )
+      {
+         for( i = 0, ibij = jbj, ibik = jbk; i < M; i++, ibij += 1, ibik += 1 )
+         { B[ibij] -= A[iakj] * B[ibik]; }
+      }
+   }
+}
+
+static void HPL_accdtrsmRLTN
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   register double            t0;
+   int                        i, iajk, ibij, ibik, j, jak, jbj, jbk, k;
+
+   for( k = 0, jak = 0, jbk = 0; k < N; k++, jak += LDA, jbk += LDB )
+   {
+      for( i = 0, ibik = jbk; i < M; i++, ibik += 1 ) { B[ibik] /= A[k+jak]; }
+      for( j = k+1,    iajk  = (k+1)+jak, jbj  = (k+1)*LDB;
+           j < N; j++, iajk += 1,         jbj += LDB )
+      {
+         t0 = A[iajk];
+         for( i = 0, ibij = jbj, ibik = jbk; i < M; i++, ibij += 1, ibik += 1 )
+         { B[ibij] -= t0 * B[ibik]; }
+      }
+      for( i = 0, ibik = jbk; i < M; i++, ibik += 1 ) { B[ibik] *= ALPHA; }
+   }
+}
+
+static void HPL_accdtrsmRLTU
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   register double            t0;
+   int                        i, iajk, ibij, ibik, j, jak, jbj, jbk, k;
+
+   for( k = 0, jak = 0, jbk = 0; k < N; k++, jak += LDA, jbk += LDB )
+   {
+      for( j = k+1,    iajk  = (k+1)+jak, jbj  = (k+1)*LDB;
+           j < N; j++, iajk += 1,         jbj += LDB )
+      {
+         t0 = A[iajk];
+         for( i = 0, ibij = jbj, ibik = jbk; i < M; i++, ibij += 1, ibik += 1 )
+         { B[ibij] -= t0 * B[ibik]; }
+      }
+      for( i = 0, ibik = jbk; i < M; i++, ibik += 1 ) { B[ibik] *= ALPHA; }
+   }
+}
+
+static void HPL_accdtrsmRUNN
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iakj, ibij, ibik, j, jaj, jbj, jbk, k;
+
+   for( j = 0, jaj = 0, jbj = 0; j < N; j++, jaj += LDA, jbj += LDB )
+   {
+      for( i = 0, ibij = jbj; i < M; i++, ibij += 1 ) { B[ibij] *= ALPHA; }
+      for( k = 0, iakj = jaj, jbk = 0; k < j; k++, iakj += 1, jbk += LDB )
+      {
+         for( i = 0, ibij = jbj, ibik = jbk; i < M; i++, ibij += 1, ibik += 1 )
+         { B[ibij] -= A[iakj] * B[ibik]; }
+      }
+      for( i = 0, ibij = jbj; i < M; i++, ibij += 1 ) { B[ibij] /= A[j+jaj]; }
+   }
+}
+
+static void HPL_accdtrsmRUNU
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, iakj, ibij, ibik, j, jaj, jbj, jbk, k;
+
+   for( j = 0, jaj = 0, jbj = 0; j < N; j++, jaj += LDA, jbj += LDB )
+   {
+      for( i = 0, ibij = jbj; i < M; i++, ibij += 1 ) { B[ibij] *= ALPHA; }
+      for( k = 0, iakj = jaj, jbk = 0; k < j; k++, iakj += 1, jbk += LDB )
+      {
+         for( i = 0, ibij = jbj, ibik = jbk; i < M; i++, ibij += 1, ibik += 1 )
+         { B[ibij] -= A[iakj] * B[ibik]; }
+      }
+   }
+}
+
+static void HPL_dtrsmRUTN
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   register double            t0;
+   int                        i, iajk, ibij, ibik, j, jak, jbj, jbk, k;
+
+   for( k = N-1,     jak  = (N-1)*LDA, jbk  = (N-1)*LDB;
+        k >= 0; k--, jak -= LDA,       jbk -= LDB )
+   {
+      for( i = 0, ibik = jbk; i < M; i++, ibik += 1 ) { B[ibik] /= A[k+jak]; }
+      for( j = 0, iajk = jak, jbj = 0; j < k; j++, iajk += 1, jbj += LDB )
+      {
+         t0 = A[iajk];
+         for( i = 0, ibij = jbj, ibik = jbk; i < M; i++, ibij += 1, ibik += 1 )
+         { B[ibij] -= t0 * B[ibik]; }
+      }
+      for( i = 0, ibik = jbk; i < M; i++, ibik += 1 ) { B[ibik] *= ALPHA; }
+   }
+}
+
+static void HPL_accdtrsmRUTU
+(
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   register double            t0;
+   int                        i, iajk, ibij, ibik, j, jak, jbj, jbk, k;
+
+   for( k = N-1,     jak  = (N-1)*LDA, jbk  = (N-1)*LDB;
+        k >= 0; k--, jak -= LDA,       jbk -= LDB )
+   {
+      for( j = 0, iajk = jak, jbj = 0; j < k; j++, iajk += 1, jbj += LDB )
+      {
+         t0 = A[iajk];
+         for( i = 0, ibij = jbj, ibik = jbk; i < M; i++, ibij += 1, ibik += 1 )
+         { B[ibij] -= t0 * B[ibik]; }
+      }
+      for( i = 0, ibik = jbk; i < M; i++, ibik += 1 ) { B[ibik] *= ALPHA; }
+   }
+}
+
+static void HPL_accdtrsm0
+(
+   const enum HPL_SIDE        SIDE,
+   const enum HPL_UPLO        UPLO,
+   const enum HPL_TRANS       TRANS,
+   const enum HPL_DIAG        DIAG,
+   const int                  M,
+   const int                  N,
+   const double               ALPHA,
+   const double               * A,
+   const int                  LDA,
+   double                     * B,
+   const int                  LDB
+)
+{
+   int                        i, j;
+
+   if( ( M == 0 ) || ( N == 0 ) ) return;
+
+   if( ALPHA == HPL_rzero )
+   {
+      for( j = 0; j < N; j++ )
+      {  for( i = 0; i < M; i++ ) *(B+i+j*LDB) = HPL_rzero; }
+      return;
+   }
+
+   if( SIDE == HplLeft )
+   {
+      if( UPLO == HplUpper )
+      {
+         if( TRANS == HplNoTrans )
+         {
+            if( DIAG == HplNonUnit )
+            {      HPL_accdtrsmLUNN( M, N, ALPHA, A, LDA, B, LDB ); }
+            else { HPL_accdtrsmLUNU( M, N, ALPHA, A, LDA, B, LDB ); }
+         }
+         else
+         {
+            if( DIAG == HplNonUnit )
+            {      HPL_accdtrsmLUTN( M, N, ALPHA, A, LDA, B, LDB ); }
+            else { HPL_accdtrsmLUTU( M, N, ALPHA, A, LDA, B, LDB ); }
+         }
+      }
+      else
+      {
+         if( TRANS == HplNoTrans )
+         {
+            if( DIAG == HplNonUnit )
+            {      HPL_accdtrsmLLNN( M, N, ALPHA, A, LDA, B, LDB ); }
+            else { HPL_accdtrsmLLNU( M, N, ALPHA, A, LDA, B, LDB ); }
+         }
+         else
+         {
+            if( DIAG == HplNonUnit )
+            {      HPL_accdtrsmLLTN( M, N, ALPHA, A, LDA, B, LDB ); }
+            else { HPL_accdtrsmLLTU( M, N, ALPHA, A, LDA, B, LDB ); }
+         }
+      }
+   }
+   else
+   {
+      if( UPLO == HplUpper )
+      {
+         if( TRANS == HplNoTrans )
+         {
+            if( DIAG == HplNonUnit )
+            {      HPL_accdtrsmRUNN( M, N, ALPHA, A, LDA, B, LDB ); }
+            else { HPL_accdtrsmRUNU( M, N, ALPHA, A, LDA, B, LDB ); }
+         }
+         else
+         {
+            if( DIAG == HplNonUnit )
+            {      HPL_dtrsmRUTN( M, N, ALPHA, A, LDA, B, LDB ); }
+            else { HPL_accdtrsmRUTU( M, N, ALPHA, A, LDA, B, LDB ); }
+         }
+      }
+      else
+      {
+         if( TRANS == HplNoTrans )
+         {
+            if( DIAG == HplNonUnit )
+            {      HPL_accdtrsmRLNN( M, N, ALPHA, A, LDA, B, LDB ); }
+            else { HPL_accdtrsmRLNU( M, N, ALPHA, A, LDA, B, LDB ); }
+         }
+         else
+         {
+            if( DIAG == HplNonUnit )
+            {      HPL_accdtrsmRLTN( M, N, ALPHA, A, LDA, B, LDB ); }
+            else { HPL_accdtrsmRLTU( M, N, ALPHA, A, LDA, B, LDB ); }
+         }
+      }
+   }
+}
+
+
 static void HPL_accdscal
 (
    const int                        N,
@@ -235,6 +756,35 @@ static void HPL_accdgemm0
       { HPL_accdgemmNT( M, N, K, ALPHA, A, LDA, B, LDB, BETA, C, LDC ); }
       else
       { HPL_accdgemmTT( M, N, K, ALPHA, A, LDA, B, LDB, BETA, C, LDC ); }
+   }
+}
+
+
+void HPL_accdtrsm
+(
+   const enum HPL_ORDER             ORDER,
+   const enum HPL_SIDE              SIDE,
+   const enum HPL_UPLO              UPLO,
+   const enum HPL_TRANS             TRANS,
+   const enum HPL_DIAG              DIAG,
+   const int                        M,
+   const int                        N,
+   const double                     ALPHA,
+   const double *                   A,
+   const int                        LDA,
+   double *                         B,
+   const int                        LDB
+)
+{
+   if( ORDER == HplColumnMajor )
+   {
+      HPL_accdtrsm0( SIDE, UPLO, TRANS, DIAG, M, N, ALPHA, A, LDA, B, LDB );
+   }
+   else
+   {
+      HPL_accdtrsm0( ( SIDE == HplRight ? HplLeft  : HplRight ),
+                  ( UPLO == HplLower ? HplUpper : HplLower ),
+                  TRANS, DIAG, N, M, ALPHA, A, LDA, B, LDB );
    }
 }
 
