@@ -204,7 +204,7 @@ void HPL_pdupdateTT
 #endif
          Aptr = Mptr( Aptr, 0, nn, lda ); nq0 += nn; 
 
-         (void) HPL_bcast( PBCST, &test ); 
+         (void) HPL_bcast( PBCST, &test );
       }
 /*
  * The panel has been forwarded at that point, finish the update
@@ -362,7 +362,7 @@ void HPL_pdupdateTT
          Uptr = Mptr( Uptr, nn, 0, LDU );
          Aptr = Mptr( Aptr, 0, nn, lda ); nq0 += nn;
 
-         (void) HPL_bcast( PBCST, &test ); 
+         (void) HPL_bcast( PBCST, &test );
       }
 /*
  * The panel has been forwarded at that point, finish the update
