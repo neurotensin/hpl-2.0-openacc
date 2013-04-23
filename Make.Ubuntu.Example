@@ -167,10 +167,18 @@ HPL_DEFS     = $(F2CDEFS) $(HPL_OPTS) $(HPL_INCLUDES)
 # - Compilers / linkers - Optimization flags ---------------------------
 # ----------------------------------------------------------------------
 #
+OMPI_CC     :=/home/remixman/Desktop/pathscale/enzobuild/Xcompiler/bin/pathcc
+export OMPI_CC
+OMPI_CFLAGS := -acc -I/opt/enzo-4.9.02/include/4.9.02/
+export OMPI_CFLAGS
 CC           = mpicc
 CCNOOPT      = $(HPL_DEFS)
 CCFLAGS      = $(HPL_DEFS) -O3
 #
+OMPI_F77    :=/home/remixman/Desktop/pathscale/enzobuild/Xcompiler/bin/pathf90
+export OMPI_F77
+OMPI_FFLAGS := -acc -I/opt/enzo-4.9.02/include/4.9.02/
+export OMPI_FFLAGS
 LINKER       = mpif77
 LINKFLAGS    = $(CCFLAGS)
 #
