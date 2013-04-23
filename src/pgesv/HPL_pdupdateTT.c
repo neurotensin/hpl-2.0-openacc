@@ -218,13 +218,18 @@ void HPL_pdupdateTT
 #else
          HPL_dlaswp00N( jb, nn, Aptr, lda, ipiv );
 #endif
-#if 1 /* _OPENACC */
+#ifdef HPL_SINGLE_NODE_GPU
+         double * Cptr = Mptr( Aptr, jb, 0, lda );
+      #pragma acc data copyin(L1ptr[0:jb*nn],L2ptr[0:mp*jb],Aptr[0:jb*nn]) \
+         copy(Cptr[0:mp*nn])
+      {
          HPL_accdtrsm( HplColumnMajor, HplLeft, HplUpper, HplTrans,
                        HplUnit, jb, nn, HPL_rone, L1ptr, jb, Aptr, lda );
 
          HPL_accdgemm( HplColumnMajor, HplNoTrans, HplNoTrans, mp, nn,
                        jb, -HPL_rone, L2ptr, ldl2, Aptr, lda, HPL_rone,
-                       Mptr( Aptr, jb, 0, lda ), lda );
+                       Cptr, lda );
+      }
 #else
          HPL_dtrsm( HplColumnMajor, HplLeft, HplUpper, HplTrans,
                     HplUnit, jb, nn, HPL_rone, L1ptr, jb, Aptr, lda );

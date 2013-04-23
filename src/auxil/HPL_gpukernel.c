@@ -589,6 +589,66 @@ static void HPL_accdscal
    }
 }
 
+#define DSCAL(N,ALPHA,X,INCX) \
+{ \
+   register double           x0, x1, x2, x3, x4, x5, x6, x7; \
+   register const double     alpha = ALPHA; \
+   const double              * StX; \
+   register int              i; \
+   int                       nu; \
+   const int                 incX2 = 2 * INCX, incX3 = 3 * INCX, \
+                             incX4 = 4 * INCX, incX5 = 5 * INCX, \
+                             incX6 = 6 * INCX, incX7 = 7 * INCX, \
+                             incX8 = 8 * INCX; \
+ \
+   if( ( N > 0 ) && ( alpha != HPL_rone ) ) \
+   { \
+      if( alpha == HPL_rzero ) \
+      { \
+         if( ( nu = ( N >> 3 ) << 3 ) != 0 ) \
+         { \
+            StX = (double *)(X) + nu * INCX; \
+ \
+            do \
+            { \
+               (*X)       = HPL_rzero; *(X+incX4) = HPL_rzero; \
+               *(X+INCX)  = HPL_rzero; *(X+incX5) = HPL_rzero; \
+               *(X+incX2) = HPL_rzero; *(X+incX6) = HPL_rzero; \
+               *(X+incX3) = HPL_rzero; *(X+incX7) = HPL_rzero; X += incX8; \
+ \
+            } while( X != StX ); \
+         } \
+ \
+         for( i = N - nu; i != 0; i-- ) { *X = HPL_rzero; X += INCX; } \
+      } \
+      else \
+      { \
+         if( ( nu = ( N >> 3 ) << 3 ) != 0 ) \
+         { \
+            StX = X + nu * INCX; \
+ \
+            do \
+            { \
+               x0 = (*X);       x4 = *(X+incX4); x1 = *(X+INCX);  x5 = *(X+incX5); \
+               x2 = *(X+incX2); x6 = *(X+incX6); x3 = *(X+incX3); x7 = *(X+incX7); \
+ \
+               x0 *= alpha;   x4 *= alpha;   x1 *= alpha;   x5 *= alpha; \
+               x2 *= alpha;   x6 *= alpha;   x3 *= alpha;   x7 *= alpha; \
+ \
+               (*X)       = x0; *(X+incX4) = x4; *(X+INCX)  = x1; *(X+incX5) = x5; \
+               *(X+incX2) = x2; *(X+incX6) = x6; *(X+incX3) = x3; *(X+incX7) = x7; \
+ \
+               X  += incX8; \
+ \
+            } while( X != StX ); \
+         } \
+ \
+         for( i = N - nu; i != 0; i-- ) \
+         { x0 = (*X); x0 *= alpha; *X = x0; X += INCX; } \
+      } \
+   } \
+}
+
 static void HPL_accdgemmNN
 (
    const int                  M,
@@ -606,13 +666,18 @@ static void HPL_accdgemmNN
 {
    register double            t0;
    int                        i, iail, iblj, icij, j, jal, jbj, jcj, l;
+   double                     * Cjcj;
 
+   #pragma acc kernels loop
    for( j = 0, jbj = 0, jcj  = 0; j < N; j++, jbj += LDB, jcj += LDC )
    {
-      HPL_accdscal( M, BETA, C+jcj, 1 );
+      Cjcj = C+jcj;
+      DSCAL( M, BETA, Cjcj, 1 );
+      #pragma acc loop
       for( l = 0, jal = 0, iblj = jbj; l < K; l++, jal += LDA, iblj += 1 )
       {
          t0 = ALPHA * B[iblj];
+         #pragma acc loop
          for( i = 0, iail = jal, icij = jcj; i < M; i++, iail += 1, icij += 1 )
          { C[icij] += A[iail] * t0; }
       }
