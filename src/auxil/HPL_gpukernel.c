@@ -668,20 +668,25 @@ static void HPL_accdgemmNN
    int                        i, iail, iblj, icij, j, jal, jbj, jcj, l;
    double                     * Cjcj;
 
-   #pragma acc kernels loop
+   #pragma acc kernels copyin(A[0:N],B[0:N]) copyout(C[0:N])
    for( j = 0, jbj = 0, jcj  = 0; j < N; j++, jbj += LDB, jcj += LDC )
    {
       Cjcj = C+jcj;
       DSCAL( M, BETA, Cjcj, 1 );
-      #pragma acc loop
+//#pragma acc loop
       for( l = 0, jal = 0, iblj = jbj; l < K; l++, jal += LDA, iblj += 1 )
       {
          t0 = ALPHA * B[iblj];
-         #pragma acc loop
-         for( i = 0, iail = jal, icij = jcj; i < M; i++, iail += 1, icij += 1 )
-         { C[icij] += A[iail] * t0; }
+	iail=jal; icij=jcj;
+#pragma acc loop
+         for( i = 0; i < M; i++ )
+         { C[icij] += A[iail] * t0; 
+	  iail += 1;  icij += 1;
+	 }
       }
+
    }
+#pragma acc end kernels
 }
 
 static void HPL_accdgemmNT
